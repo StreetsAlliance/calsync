@@ -7,11 +7,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  calsync:
+  calsync-bfg:
     runs-on: ubuntu-latest
+    envronment: bfg
     name: 🔁 Sync Events
     steps:
-      - uses: acm-uic/calsync@main
+      - uses: StreetsAlliance/calsync@main
         with:
           discord-guild-id: ${{ secrets.DISCORD_EVENTS_SYNC_DISCORD_GUILD_ID }}
           discord-bot-token: ${{ secrets.DISCORD_EVENTS_SYNC_DISCORD_BOT_TOKEN }}
