@@ -9,7 +9,7 @@ on:
 jobs:
   calsync-bfg:
     runs-on: ubuntu-latest
-    envronment: bfg
+    environment: bfg
     name: 🔁 Sync Events
     steps:
       - uses: StreetsAlliance/calsync@main
