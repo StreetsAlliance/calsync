@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     name: 🔁 Sync Events
     steps:
-      - uses: acm-uic/calsync@main
+      - uses: StreetsAlliance/calsync@main
         with:
           discord-guild-id: ${{ secrets.DISCORD_GUILD_ID }}
           discord-bot-token: ${{ secrets.DISCORD_BOT_TOKEN }}
