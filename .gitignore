@@ -1,2 +1,4 @@
 .env
 dist
+.local.env
+.vscode/launch.json

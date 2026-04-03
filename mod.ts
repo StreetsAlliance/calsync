@@ -1,39 +1,55 @@
-import {
-  BaseChannel,
-  CalendarEvent,
-  CalendarEventDateTime,
-  CalendarEventsResponse,
-  ChannelType,
-  CreateEventRequestData,
-  DiscordEvent,
-  EntityMetadata,
-  EventEntityType,
-  EventPrivacyLevel,
-  PatchEventRequestData,
-} from "./interfaces.ts";
-import { DiscordClient } from "./discord.ts";
 import { loadEnvConfig } from "./envConfig.ts";
-import { GoogleCalendarClient } from "./gcal.ts";
+import {
+  ChannelType,
+  Client,
+  Guild,
+  GuildScheduledEvent,
+  GuildScheduledEventCreateOptions,
+  GuildScheduledEventEntityType,
+  GuildScheduledEventPrivacyLevel,
+  GuildScheduledEventStatus,
+  GuildVoiceChannelResolvable,
+  StageChannel,
+  VoiceChannel,
+} from "discord.js";
 
-const TWO_WEEKS = 1000 * 3600 * 24 * 7 * 2;
+import { JWT } from "npm:google-auth-library";
+import { calendar_v3, google } from "googleapis";
+
+const FOUR_WEEKS = 1000 * 3600 * 24 * 7 * 4;
 
 const envConfig = loadEnvConfig();
-const discordClient = new DiscordClient(envConfig.discord);
-const gCalClient = new GoogleCalendarClient(envConfig.googleCalendar);
+const discordClient = new Client({ intents: [] });
 
 const discordApplicationId = envConfig.discord.applicationId;
 const syncDateRange = {
   from: new Date(),
-  to: new Date(Date.now() + TWO_WEEKS),
+  to: new Date(Date.now() + FOUR_WEEKS),
 };
 
+const jsonKeys = JSON.parse(envConfig.googleCalendar.serviceAccountKeyJson!);
+
+const client = new JWT({
+  client_id: jsonKeys.client_id,
+  key: jsonKeys.private_key,
+  scopes: ["https://www.googleapis.com/auth/calendar.events"],
+  email: jsonKeys.client_email,
+});
+
+const gCalClient = google.calendar({ version: "v3", auth: client });
+
+discordClient.login(envConfig.discord.botToken).catch((err) => {
+  console.error("Login failed:", err);
+  Deno.exit();
+});
+
 const calendarToDiscordEvent = (
-  discordChannels: BaseChannel[],
-  calEvent: CalendarEvent,
-): PatchEventRequestData | CreateEventRequestData | undefined => {
+  discordChannels: (StageChannel | VoiceChannel)[],
+  calEvent: calendar_v3.Schema$Event,
+): GuildScheduledEventCreateOptions | undefined => {
   const parseDates = (
-    start: CalendarEventDateTime,
-    end: CalendarEventDateTime,
+    start: calendar_v3.Schema$EventDateTime,
+    end: calendar_v3.Schema$EventDateTime,
   ) => {
     let startParsed: Date | undefined = undefined;
     let endParsed: Date | undefined = undefined;
@@ -49,19 +65,19 @@ const calendarToDiscordEvent = (
   };
   const parseEventLocation = (
     location: string,
-  ): [EventEntityType | undefined, string | undefined] => {
+  ): [GuildScheduledEventEntityType | undefined, string | undefined] => {
     if (!location.startsWith("Discord")) {
-      return [EventEntityType.EXTERNAL, location.trim()];
+      return [GuildScheduledEventEntityType.External, location.trim()];
     }
     if (location.startsWith("Discord Voice:")) {
       return [
-        EventEntityType.VOICE,
+        GuildScheduledEventEntityType.Voice,
         location.split("Discord Voice:")[1]?.trim(),
       ];
     }
     if (location.startsWith("Discord Stage:")) {
       return [
-        EventEntityType.STAGE_INSTANCE,
+        GuildScheduledEventEntityType.StageInstance,
         location.split("Discord Stage:")[1]?.trim(),
       ];
     }
@@ -78,35 +94,34 @@ const calendarToDiscordEvent = (
   if (!startDate || !endDate) {
     return undefined;
   }
-  const [entity_type, eventLocation] = calEvent.location
+  const [entityType, eventLocation] = calEvent.location
     ? parseEventLocation(calEvent.location)
-    : [EventEntityType.EXTERNAL, "🤷"];
+    : [GuildScheduledEventEntityType.External, "🤷"];
 
-  if (!entity_type || !eventLocation) {
+  if (!entityType || !eventLocation) {
     return undefined;
   }
 
-  let channel_id: string | null = null;
-  let entity_metadata: EntityMetadata | null = null;
+  let channel: GuildVoiceChannelResolvable | undefined = undefined;
+  let entityMetadata: { location: string | undefined } | undefined = undefined;
 
-  const channelIdFromLocation = discordChannels?.find((c) => c.name.toLowerCase().includes(eventLocation.toLowerCase()))
-    ?.id;
-  switch (entity_type) {
-    case EventEntityType.EXTERNAL:
-      channel_id = null;
-      entity_metadata = { location: eventLocation };
+  const channelFromLocation = discordChannels?.find((c) => c.name.toLowerCase().includes(eventLocation.toLowerCase()));
+  switch (entityType) {
+    case GuildScheduledEventEntityType.External:
+      channel = undefined;
+      entityMetadata = { location: eventLocation };
       break;
-    case EventEntityType.VOICE:
-      entity_metadata = null;
-      if (channelIdFromLocation) {
-        channel_id = channelIdFromLocation;
+    case GuildScheduledEventEntityType.Voice:
+      entityMetadata = undefined;
+      if (channelFromLocation) {
+        channel = channelFromLocation;
       } else {
         return undefined;
       }
       break;
-    case EventEntityType.STAGE_INSTANCE:
-      if (channelIdFromLocation) {
-        channel_id = channelIdFromLocation;
+    case GuildScheduledEventEntityType.StageInstance:
+      if (channelFromLocation) {
+        channel = channelFromLocation;
       } else {
         return undefined;
       }
@@ -114,42 +129,44 @@ const calendarToDiscordEvent = (
   }
   const description: string = `${calEvent.description ?? ""}\nCalendar event link: ${calEvent.htmlLink}`.trim();
 
-  const discordEventData: CreateEventRequestData | PatchEventRequestData = {
+  const discordEventData: GuildScheduledEventCreateOptions = {
     name: calEvent.summary,
     description,
-    privacy_level: EventPrivacyLevel.GUILD_ONLY,
-    channel_id,
-    entity_metadata,
-    scheduled_start_time: startDate.toISOString(),
-    scheduled_end_time: endDate.toISOString(),
-    entity_type,
+    privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly,
+    channel,
+    entityMetadata,
+    scheduledStartTime: startDate,
+    scheduledEndTime: endDate,
+    entityType,
   };
 
   return discordEventData;
 };
 
-const getDiscordEvents = async (): Promise<DiscordEvent[]> => {
-  return await discordClient.getEvents({ with_user_count: "false" });
+const getDiscordEvents = async (guild: Guild): Promise<GuildScheduledEvent<GuildScheduledEventStatus>[]> => {
+  return (await guild?.scheduledEvents.fetch())?.values()
+    .toArray() ?? [];
 };
-const getDiscordChannels = async () => {
-  const discordChannels: BaseChannel[] = await discordClient.getChannels();
-  const voiceStageChannels = discordChannels.filter(
+const getDiscordChannels = async (guild: Guild): Promise<(StageChannel | VoiceChannel)[]> => {
+  const discordChannels = await guild?.channels.fetch();
+  const voiceStageChannels = discordChannels?.filter(
     (c) =>
-      c.type === ChannelType.GUILD_STAGE_VOICE ||
-      c.type === ChannelType.GUILD_VOICE,
+      c?.type === ChannelType.GuildStageVoice ||
+      c?.type === ChannelType.GuildVoice,
   );
-  return voiceStageChannels;
+  return voiceStageChannels?.values().toArray() ?? [];
 };
 
 const getCalendarEvents = async () => {
-  const gCalResponse: CalendarEventsResponse = await gCalClient.getEvents({
+  const gCalResponse: calendar_v3.Schema$Event[] = (await gCalClient.events.list({
+    calendarId: envConfig.googleCalendar.calendarId,
     singleEvents: true,
     maxResults: 100,
-    timeMin: syncDateRange.from,
-    timeMax: syncDateRange.to,
+    timeMin: syncDateRange.from.toISOString(),
+    timeMax: syncDateRange.to.toISOString(),
     orderBy: "startTime",
-  });
-  return gCalResponse.items;
+  })).data.items ?? [];
+  return gCalResponse;
 };
 
 const discordApiTimeout = async () => {
@@ -157,33 +174,32 @@ const discordApiTimeout = async () => {
 };
 
 const compareEvents = (
-  event1: CreateEventRequestData | PatchEventRequestData | DiscordEvent,
-  event2: CreateEventRequestData | PatchEventRequestData | DiscordEvent,
+  event1: GuildScheduledEventCreateOptions,
+  event2: GuildScheduledEvent<GuildScheduledEventStatus>,
 ): boolean => {
-  const normalizeDate = (
-    dateStr: string | null,
-  ) => (dateStr ? new Date(dateStr).getTime() : undefined);
   return !(
     event1.name !== event2.name ||
-    event1.description !== event2.description ||
-    event1.channel_id !== event2.channel_id ||
-    event1.privacy_level !== event2.privacy_level ||
-    event1.entity_type !== event2.entity_type ||
-    event1.entity_metadata?.location !== event2.entity_metadata?.location ||
-    normalizeDate(event1.scheduled_end_time) !==
-      normalizeDate(event2.scheduled_end_time) ||
-    normalizeDate(event1.scheduled_start_time) !==
-      normalizeDate(event2.scheduled_start_time)
+    (event1.description ?? "") !== (event2.description ?? "") ||
+    (event1.channel ?? null) !== (event2.channel ?? null) ||
+    event1.privacyLevel !== event2.privacyLevel ||
+    event1.entityType !== event2.entityType ||
+    (event1.entityMetadata?.location || null) !== (event2.entityMetadata?.location || null) ||
+    event1.scheduledStartTime.valueOf() !== event2.scheduledStartAt?.getTime() ||
+    event1.scheduledEndTime?.valueOf() !== event2.scheduledEndAt?.getTime()
   );
 };
 
 const syncEvents = async () => {
   console.info("syncing events");
-  const discordChannels = await getDiscordChannels();
+  const guild = discordClient.guilds.cache.get(envConfig.discord.guildId);
+  if (!guild) {
+    return;
+  }
+  const discordChannels = await getDiscordChannels(guild);
   const gCalEvents = await getCalendarEvents();
 
   // filter events created by the bot
-  const discordEvents = (await getDiscordEvents()).filter((e) => e.creator_id === discordApplicationId);
+  const discordEvents = (await getDiscordEvents(guild)).filter((e) => e.creatorId === discordApplicationId);
 
   if (gCalEvents) {
     console.info(`Received ${gCalEvents.length} calendar events.`);
@@ -204,7 +220,7 @@ const syncEvents = async () => {
         const existingDiscordEvent = discordEvents.find(
           (discordEvent) =>
             calEvent.htmlLink !== undefined &&
-            discordEvent.description.endsWith(calEvent.htmlLink),
+            discordEvent.description?.endsWith(calEvent.htmlLink!),
         );
         if (existingDiscordEvent) {
           if (compareEvents(discordEvent, existingDiscordEvent)) {
@@ -214,19 +230,23 @@ const syncEvents = async () => {
             );
             continue;
           } else {
-            const response = await discordClient.patchEvent({
-              id: existingDiscordEvent.id,
-              eventData: discordEvent as PatchEventRequestData,
-            });
-            console.info(`${response.id}: Event updated.`);
-            discordEventsProcessed[response.id] = true;
+            const response = await guild?.scheduledEvents.edit(
+              existingDiscordEvent.id,
+              discordEvent,
+            );
+            if (response) {
+              console.info(`${response.id}: Event updated.`);
+              discordEventsProcessed[response.id] = true;
+            }
           }
         } else {
-          const response = await discordClient.createEvent({
-            eventData: discordEvent as CreateEventRequestData,
-          });
-          console.info(`${response.id}: Event created.`);
-          discordEventsProcessed[response.id] = true;
+          const response = await guild?.scheduledEvents.create(
+            discordEvent,
+          );
+          if (response) {
+            console.info(`${response.id}: Event created.`);
+            discordEventsProcessed[response.id] = true;
+          }
         }
         await discordApiTimeout();
       }
@@ -236,7 +256,9 @@ const syncEvents = async () => {
           continue;
         } else {
           // delete all other events
-          await discordClient.deleteEvent({ id: event.id });
+          await guild.scheduledEvents.delete(
+            event.id,
+          );
           console.info(`${event.id}: Event deleted.`);
           await discordApiTimeout();
         }
@@ -250,4 +272,7 @@ const syncEvents = async () => {
   }
 };
 
-await syncEvents();
+discordClient.once("clientReady", async () => {
+  await syncEvents();
+  Deno.exit();
+});

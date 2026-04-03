@@ -24,12 +24,10 @@ export class GoogleCalendarClient {
     | undefined;
 
   constructor(
-    options:
-      | { calendarId: string; apiKey: string }
-      | {
-        calendarId: string;
-        serviceAccountKeyJson: string;
-      },
+    options: {
+      calendarId: string;
+      serviceAccountKeyJson: string;
+    },
   ) {
     if ("serviceAccountKeyJson" in options) {
       const { calendarId, serviceAccountKeyJson } = options;

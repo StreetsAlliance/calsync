@@ -37,7 +37,7 @@ export const loadEnvConfig = () => {
     },
     googleCalendar: {
       calendarId: getEnv("GOOGLE_CALENDAR_CALENDAR_ID")!,
-      ...(serviceAccountKeyJson ? { serviceAccountKeyJson: serviceAccountKeyJson! } : { apiKey: apiKey! }),
+      serviceAccountKeyJson: serviceAccountKeyJson!
     },
   };
 
