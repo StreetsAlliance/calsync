@@ -3,7 +3,7 @@
     "strict": true
   },
   "tasks": {
-    "start": "deno run --env-file=.local.env --allow-read=. --allow-net --allow-env mod.ts",
+    "start": "deno run --env-file=.local.env --allow-read=. --allow-net --allow-env mod.ts"
   },
   "fmt": {
     "indentWidth": 2,
