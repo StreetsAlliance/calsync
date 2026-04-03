@@ -13,7 +13,6 @@ import {
   VoiceChannel,
 } from "discord.js";
 
-import { JWT } from "npm:google-auth-library";
 import { calendar_v3, google } from "googleapis";
 
 const FOUR_WEEKS = 1000 * 3600 * 24 * 7 * 4;
@@ -29,7 +28,7 @@ const syncDateRange = {
 
 const jsonKeys = JSON.parse(envConfig.googleCalendar.serviceAccountKeyJson!);
 
-const client = new JWT({
+const client = new google.auth.JWT({
   client_id: jsonKeys.client_id,
   key: jsonKeys.private_key,
   scopes: ["https://www.googleapis.com/auth/calendar.events"],
