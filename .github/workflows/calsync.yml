@@ -3,7 +3,7 @@ name: sync
 on:
   schedule:
     # At minute 32 (picked randomly) past every 12th hour
-    - cron: 32 */12 * * *
+    - cron: 32 */1 * * *
   workflow_dispatch:
 
 jobs:
