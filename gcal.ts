@@ -12,6 +12,8 @@ export interface IGetCalendarEventsParams {
   /** Sort events by startTime or updated (last modification time) */
   orderBy: "startTime" | "updated";
 }
+const LAST_RUN = "lastrun";
+const DISCORD_ID = "discordid";
 
 export class GoogleCalendarClient {
   #calendarId: string;
@@ -62,9 +64,9 @@ export class GoogleCalendarClient {
       requestBody.extendedProperties = { private: {} };
     }
 
-    requestBody.extendedProperties!.private!["lastRun"] = new Date().getTime().toString();
+    requestBody.extendedProperties!.private![LAST_RUN] = new Date().getTime().toString();
     if (dEventId) {
-      requestBody.extendedProperties!.private!["discordid"] = dEventId;
+      requestBody.extendedProperties!.private![DISCORD_ID] = dEventId;
     }
 
     await this.#calendarClient.events.update({
@@ -85,8 +87,8 @@ export class GoogleCalendarClient {
       requestBody: {
         extendedProperties: {
           private: {
-            "discordid": dEventId,
-            "lastrun": new Date().getTime().toString(),
+            DISCORD_ID: dEventId,
+            LAST_RUN: new Date().getTime().toString(),
           },
         },
       },
@@ -105,7 +107,7 @@ export class GoogleCalendarClient {
       requestBody.extendedProperties.private = {};
     }
 
-    requestBody.extendedProperties.private["lastrun"] = new Date().getTime().toString();
+    requestBody.extendedProperties.private[LAST_RUN] = new Date().getTime().toString();
 
     await this.#calendarClient.events.patch({
       calendarId: this.#calendarId,
@@ -131,9 +133,9 @@ export class GoogleCalendarClient {
     }
 
     event.calendarId = this.#calendarId;
-    event.requestBody!.extendedProperties = { private: { "lastrun": new Date().getTime().toString() } };
+    event.requestBody!.extendedProperties = { private: { LAST_RUN: new Date().getTime().toString() } };
     if (discordId) {
-      event.requestBody!.extendedProperties!.private!["discordid"] = discordId;
+      event.requestBody!.extendedProperties!.private![DISCORD_ID] = discordId;
     }
 
     await this.#calendarClient.events.insert(event);
