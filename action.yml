@@ -1,19 +1,17 @@
 name: "calsync"
 inputs:
+  commit:
+    required: false
   discord-guild-id:
     required: true
   discord-bot-token:
     required: true
-  discord-application-id:
+  event-prefix:
     required: true
   google-calendar-id:
     required: true
   google-service-account-key-json:
-    description: "Either google-api-key or google-service-account-key-json needs to be specified"
-    required: false
-  google-api-key:
-    description: "Either google-api-key or google-service-account-key-json needs to be specified"
-    required: false
+    required: true
 runs:
   using: "composite"
   steps:
@@ -29,7 +27,7 @@ runs:
       env:
         DISCORD_EVENTS_SYNC_DISCORD_GUILD_ID: ${{ inputs.discord-guild-id }}
         DISCORD_EVENTS_SYNC_DISCORD_BOT_TOKEN: ${{ inputs.discord-bot-token }}
-        DISCORD_EVENTS_SYNC_DISCORD_APPLICATION_ID: ${{ inputs.discord-application-id }}
         DISCORD_EVENTS_SYNC_GOOGLE_CALENDAR_CALENDAR_ID: ${{ inputs.google-calendar-id }}
-        DISCORD_EVENTS_SYNC_GOOGLE_CALENDAR_API_KEY: ${{ inputs.google-api-key }}
         DISCORD_EVENTS_SYNC_GOOGLE_CALENDAR_SERVICE_ACCOUNT_KEY_JSON: ${{ inputs.google-service-account-key-json }}
+        DISCORD_EVENTS_SYNC_EVENT_PREFIX: ${{ inputs.event-prefix }}
+        DISCORD_EVENTS_SYNC_COMMIT: ${{ inputs.commit }}
