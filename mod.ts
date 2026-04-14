@@ -126,7 +126,7 @@ const syncEvents = async () => {
     }
 
     if (!updated && gCalEvent.status !== "cancelled") {
-      console.info(`Updating gcal last run for ${gCalEvent.summary} Start: ${gCalEvent.start?.dateTime}`)
+      console.info(`Updating gcal last run for ${gCalEvent.summary} Start: ${gCalEvent.start?.dateTime}`);
       await gCalClient.updateEvent(gCalEvent);
     }
   }
