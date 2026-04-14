@@ -113,7 +113,7 @@ export class DiscordClient {
     if (!this.#commit) {
       return;
     }
-    
+
     await this.getGuild();
     await this.#guild?.scheduledEvents.edit(
       id,
