@@ -7,8 +7,7 @@ import { calendar_v3 } from "googleapis";
 import { Event } from "./event.ts";
 import { GoogleCalendarClient } from "./gcal.ts";
 
-const HOUR = 1000 * 3600;
-const FOUR_WEEKS = HOUR * 24 * 7 * 4;
+const FOUR_WEEKS = 1000 * 3600 * 24 * 7 * 4;
 const DISCORD_LINK_PROPERTY = "discordid";
 const envConfig = loadEnvConfig();
 
@@ -72,6 +71,7 @@ const syncEvents = async () => {
   console.info(`Processing ${gCalEvents.length} Google Calendar Events`);
   //Loop through events where the gcal event hasn't been linked to discord
   for (const gCalEvent of gCalEvents) {
+    let updated = false;
     if (gCalEvent.extendedProperties?.private && DISCORD_LINK_PROPERTY in gCalEvent.extendedProperties.private) {
       //Event is linked to discord
       const dScheduledEvent = dScheduledEvents.find((dEvent) =>
@@ -89,7 +89,10 @@ const syncEvents = async () => {
 
           if (!dEventCompare.equals(gEvent)) {
             //Events are not equal, need to compare.
-            if (gCalEvent.updated && new Date(gCalEvent.updated) >= new Date(Date.now() - HOUR)) {
+            if (
+              gCalEvent.updated &&
+              new Date(gCalEvent.updated).getTime() - parseInt(gCalEvent.extendedProperties?.private?.lastrun) > 10000
+            ) {
               //Event updated recently in google calendar
               console.info(`Event ${gCalEvent.summary} updated in gcal`);
               await discordClient.patchScheduledEvent(
@@ -101,6 +104,8 @@ const syncEvents = async () => {
               console.info(`Event ${gCalEvent.summary} updated in discord`);
               dEventCompare.getGoogleInsertEvent(false);
               await gCalClient.patchEvent(gCalEvent.id ?? "", dEventCompare.getGoogleInsertEvent(false).requestBody!);
+
+              updated = true;
             }
           } else {
             console.info(`Event ${gCalEvent.summary} no action`);
@@ -117,6 +122,12 @@ const syncEvents = async () => {
     } else if (gCalEvent.status !== "cancelled") {
       //Event isn't linked
       await processedUnlinkedEvent(gCalEvent, dScheduledEvents, discordChannels, processedEvents);
+      updated = true;
+    }
+
+    if (!updated && gCalEvent.status !== "cancelled") {
+      console.info(`Updating gcal last run for ${gCalEvent.summary} Start: ${gCalEvent.start?.dateTime}`)
+      await gCalClient.updateEvent(gCalEvent);
     }
   }
 

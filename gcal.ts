@@ -49,6 +49,31 @@ export class GoogleCalendarClient {
     return gCalResponse;
   }
 
+  public async getEvent(eventId: string) {
+    return await this.#calendarClient.events.get({ calendarId: this.#calendarId, eventId });
+  }
+
+  public async updateEvent(requestBody: calendar_v3.Schema$Event, dEventId?: string) {
+    if (!this.#commit) {
+      return;
+    }
+
+    if (!requestBody.extendedProperties) {
+      requestBody.extendedProperties = { private: {} };
+    }
+
+    requestBody.extendedProperties!.private!["lastRun"] = new Date().getTime().toString();
+    if (dEventId) {
+      requestBody.extendedProperties!.private!["discordid"] = dEventId;
+    }
+
+    await this.#calendarClient.events.update({
+      calendarId: this.#calendarId,
+      eventId: requestBody.id!,
+      requestBody,
+    });
+  }
+
   public async addDiscordId(eventId: string, dEventId: string) {
     if (!this.#commit) {
       return;
@@ -58,7 +83,12 @@ export class GoogleCalendarClient {
       calendarId: this.#calendarId,
       eventId: eventId,
       requestBody: {
-        extendedProperties: { private: { "discordid": dEventId } },
+        extendedProperties: {
+          private: {
+            "discordid": dEventId,
+            "lastrun": new Date().getTime().toString(),
+          },
+        },
       },
     });
   }
@@ -67,6 +97,15 @@ export class GoogleCalendarClient {
     if (!this.#commit) {
       return;
     }
+
+    if (!requestBody.extendedProperties) {
+      requestBody.extendedProperties = { private: undefined };
+    }
+    if (!requestBody.extendedProperties.private) {
+      requestBody.extendedProperties.private = {};
+    }
+
+    requestBody.extendedProperties.private["lastrun"] = new Date().getTime().toString();
 
     await this.#calendarClient.events.patch({
       calendarId: this.#calendarId,
@@ -92,9 +131,11 @@ export class GoogleCalendarClient {
     }
 
     event.calendarId = this.#calendarId;
+    event.requestBody!.extendedProperties = { private: { "lastrun": new Date().getTime().toString() } };
     if (discordId) {
-      event.requestBody!.extendedProperties = { private: { "discordid": discordId } };
+      event.requestBody!.extendedProperties!.private!["discordid"] = discordId;
     }
+
     await this.#calendarClient.events.insert(event);
   }
 }
