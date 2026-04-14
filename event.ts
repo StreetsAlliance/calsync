@@ -252,12 +252,18 @@ export class Event {
     return [deventType, location];
   };
 
-  getDiscordCreateOption(discordChannels: (StageChannel | VoiceChannel)[]): GuildScheduledEventCreateOptions {
+  getDiscordCreateOption(
+    discordChannels: (StageChannel | VoiceChannel)[],
+    prefix: string,
+  ): GuildScheduledEventCreateOptions {
     const [entityType, eventLocation] = this.#parseEventLocation();
     const channelFromLocation = eventLocation
       ? discordChannels?.find((c) => c.name.toLowerCase().includes(eventLocation.toLowerCase()))
       : null;
 
+    if (this.title.indexOf(prefix) < 0) {
+      this.title = prefix + " - " + this.title;
+    }
     const newDEvent = {
       name: this.title,
       entityMetadata: this.location ? { location: this.location } : undefined,
@@ -267,37 +273,49 @@ export class Event {
       privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly,
       entityType: entityType,
       channel: channelFromLocation,
-      recurrenceRule: this.recurrence
-        ? this.#recurrenceRuleToDiscordRecurrence(this.recurrence, this.startDate)
-        : undefined,
+      //Not copying over recurrence to discord
+      // recurrenceRule: this.recurrence
+      //   ? this.#recurrenceRuleToDiscordRecurrence(this.recurrence, this.startDate)
+      //   : undefined,
     } as GuildScheduledEventCreateOptions;
 
     return newDEvent;
   }
 
-  getGoogleInsertEvent(event: Event): calendar_v3.Params$Resource$Events$Insert {
+  getGoogleInsertEvent(withRecurrence: boolean): calendar_v3.Params$Resource$Events$Insert {
     const newGEvent = {
       requestBody: {
-        summary: event.title,
-        location: event.location,
-        description: event.description,
+        summary: this.title,
+        location: this.location,
+        description: this.description,
         start: {
-          dateTime: event.startDate.toISOString().split(".")[0] + "-00:00",
+          dateTime: this.startDate.toISOString().split(".")[0] + "-00:00",
           timeZone: "UTC",
         },
         end: {
-          dateTime: event.endDate?.toISOString().split(".")[0] + "-00:00",
+          dateTime: this.endDate?.toISOString().split(".")[0] + "-00:00",
           timeZone: "UTC",
         },
-        recurrence: event.recurrence ? [this.#generateRecurrenceRule(event.recurrence)] : null,
       },
     } as calendar_v3.Params$Resource$Events$Insert;
 
+    if (withRecurrence && this.recurrence) {
+      newGEvent.requestBody!.recurrence = [this.#generateRecurrenceRule(this.recurrence)];
+    }
+
     return newGEvent;
+  }
+
+  equals(event: Event): boolean {
+    return this.title == event.title &&
+      this.location == event.location &&
+      this.description == event.description &&
+      this.startDate.getTime() == event.startDate.getTime() &&
+      this.endDate?.getTime() == event.endDate?.getTime();
   }
 }
 
-export type RecurrenceRule = {
+type RecurrenceRule = {
   frequency: Frequency;
   interval: number;
   count: number;
@@ -307,18 +325,18 @@ export type RecurrenceRule = {
   weekdayOfMonth: WeekdayOfMonth[];
 };
 
-export type WeekdayOfMonth = {
+type WeekdayOfMonth = {
   weekday: Weekday;
   n: number;
 };
 
-export enum Source {
+enum Source {
   Discord,
   Facebook,
   Google,
 }
 
-export enum Frequency {
+enum Frequency {
   SECONDLY = "SECONDLY",
   MINUTELY = "MINUTELY",
   HOURLY = "HOURLY",
@@ -328,7 +346,7 @@ export enum Frequency {
   YEARLY = "YEARLY",
 }
 
-export enum Weekday {
+enum Weekday {
   SU = "SU",
   MO = "MO",
   TU = "TU",

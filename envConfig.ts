@@ -16,28 +16,20 @@ const getEnv = (name: string, required: boolean = true) => {
 };
 
 export const loadEnvConfig = () => {
-  const serviceAccountKeyJson = getEnv(
-    "GOOGLE_CALENDAR_SERVICE_ACCOUNT_KEY_JSON",
-    false,
-  );
-
-  const apiKey = getEnv("GOOGLE_CALENDAR_API_KEY", false);
-
-  if (!serviceAccountKeyJson && !apiKey) {
-    throw new Error(
-      `Either {${ENVIRONMENT_VARIABLE_PREFIX}GOOGLE_CALENDAR_SERVICE_ACCOUNT_KEY_JSON} or {${ENVIRONMENT_VARIABLE_PREFIX}GOOGLE_CALENDAR_API_KEY} must be provided.`,
-    );
-  }
-
   const config = {
+    settings: {
+      eventPrefix: getEnv("EVENT_PREFIX")!,
+      commitChanges: getEnv("COMMIT", false)?.toLowerCase() === "true",
+    },
     discord: {
       guildId: getEnv("DISCORD_GUILD_ID")!,
       botToken: getEnv("DISCORD_BOT_TOKEN")!,
-      applicationId: getEnv("DISCORD_APPLICATION_ID")!,
     },
     googleCalendar: {
       calendarId: getEnv("GOOGLE_CALENDAR_CALENDAR_ID")!,
-      serviceAccountKeyJson: serviceAccountKeyJson!,
+      serviceAccountKeyJson: getEnv(
+        "GOOGLE_CALENDAR_SERVICE_ACCOUNT_KEY_JSON",
+      )!,
     },
   };
 
