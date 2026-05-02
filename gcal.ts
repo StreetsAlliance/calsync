@@ -81,18 +81,20 @@ export class GoogleCalendarClient {
       return;
     }
 
-    await this.#calendarClient.events.patch({
+
+    const patchBody = {
       calendarId: this.#calendarId,
       eventId: eventId,
       requestBody: {
         extendedProperties: {
           private: {
-            DISCORD_ID: dEventId,
-            LAST_RUN: new Date().getTime().toString(),
           },
         },
       },
-    });
+    } as calendar_v3.Params$Resource$Events$Patch;
+    patchBody.requestBody!.extendedProperties!.private![LAST_RUN] = new Date().getTime().toString();
+    patchBody.requestBody!.extendedProperties!.private![DISCORD_ID] = dEventId;
+    await this.#calendarClient.events.patch(patchBody);
   }
 
   public async patchEvent(eventId: string, requestBody: calendar_v3.Schema$Event) {

@@ -116,6 +116,7 @@ const syncEvents = async () => {
       } else {
         if (gCalEvent.status != "cancelled") {
           console.info(`Event ${gCalEvent.summary} deleted in discord`);
+          updated = true;
           await gCalClient.deleteEvent(gCalEvent.id!);
         }
       }
