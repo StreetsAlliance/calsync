@@ -81,14 +81,12 @@ export class GoogleCalendarClient {
       return;
     }
 
-
     const patchBody = {
       calendarId: this.#calendarId,
       eventId: eventId,
       requestBody: {
         extendedProperties: {
-          private: {
-          },
+          private: {},
         },
       },
     } as calendar_v3.Params$Resource$Events$Patch;
