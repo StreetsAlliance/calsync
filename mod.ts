@@ -73,6 +73,7 @@ const syncEvents = async () => {
   for (const gCalEvent of gCalEvents) {
     let updated = false;
     if (gCalEvent.extendedProperties?.private && DISCORD_LINK_PROPERTY in gCalEvent.extendedProperties.private) {
+      console.info(`Starting match for ${gCalEvent.summary} with property ${gCalEvent.extendedProperties!.private![DISCORD_LINK_PROPERTY]}`);
       //Event is linked to discord
       const dScheduledEvent = dScheduledEvents.find((dEvent) =>
         dEvent.id == gCalEvent.extendedProperties!.private![DISCORD_LINK_PROPERTY]
