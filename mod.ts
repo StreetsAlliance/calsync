@@ -79,6 +79,7 @@ const syncEvents = async () => {
       );
 
       if (dScheduledEvent) {
+        console.info(`Event ${gCalEvent.summary} is connected to discord event`);
         if (gCalEvent.status == "cancelled") {
           //delete from discord
           console.info(`Event ${gCalEvent.summary} deleted from discord`);
