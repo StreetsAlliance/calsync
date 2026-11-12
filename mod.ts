@@ -149,7 +149,7 @@ const syncEvents = async () => {
       );
       resync = true;
     } else {
-      console.info(`Creating ${event.title} as new event in google calendar`);
+      console.info(`Creating ${event.title} as new event in google calendar for discord evet ${dEvent.id}`);
       await gCalClient.insertEvent(event.getGoogleInsertEvent(false), dEvent.id);
     }
   }
