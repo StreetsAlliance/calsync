@@ -76,10 +76,10 @@ const syncEvents = async () => {
   const groupedEventsByNameAndStart = Object.groupBy(gCalEvents, ({ summary, start }) => summary + start.dateTime);
 
   for (const groupKey in groupedEventsByNameAndStart) {
-    let groupedEvents = groupedEventsByNameAndStart[groupKey]!;
+    const groupedEvents = groupedEventsByNameAndStart[groupKey]!;
     let gCalEvent = groupedEvents[0];
     if (groupedEvents.length > 1) {
-      let activeEvent = groupedEvents.find((item) => item.status != "cancelled");
+      const activeEvent = groupedEvents.find((item) => item.status != "cancelled");
       if (activeEvent) {
         gCalEvent = activeEvent;
       }
