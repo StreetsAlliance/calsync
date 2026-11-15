@@ -74,7 +74,7 @@ const syncEvents = async () => {
     let updated = false;
     if (gCalEvent.extendedProperties?.private && DISCORD_LINK_PROPERTY in gCalEvent.extendedProperties.private) {
       console.info(
-        `Starting match for ${gCalEvent.summary} with property ${
+        `Starting match for ${gCalEvent.summary} with EventId ${gCalEvent.id} with discord link property ${
           gCalEvent.extendedProperties!.private![DISCORD_LINK_PROPERTY]
         }`,
       );
