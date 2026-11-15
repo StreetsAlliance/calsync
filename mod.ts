@@ -7,7 +7,7 @@ import { calendar_v3 } from "googleapis";
 import { Event } from "./event.ts";
 import { GoogleCalendarClient } from "./gcal.ts";
 
-const FOUR_WEEKS = 1000 * 3600 * 24 * 7 * 4;
+const EIGHT_WEEKS = 1000 * 3600 * 24 * 7 * 8;
 const DISCORD_LINK_PROPERTY = "discordid";
 const envConfig = loadEnvConfig();
 
@@ -20,7 +20,7 @@ const discordClient = new DiscordClient(
 const gCalClient = new GoogleCalendarClient(
   envConfig.googleCalendar.serviceAccountKeyJson,
   envConfig.googleCalendar.calendarId,
-  new Date(Date.now() + FOUR_WEEKS),
+  new Date(Date.now() + EIGHT_WEEKS),
   envConfig.settings.commitChanges,
 );
 
@@ -62,7 +62,7 @@ const syncEvents = async () => {
   const discordChannels = await discordClient.getChannels();
   const gCalEvents = await gCalClient.getEvents();
 
-  // filter events created by the bot
+  // filter events that start with BFG
   const dScheduledEvents = (await discordClient.getScheduledEvents()).filter((e) =>
     e.name.trim().toUpperCase().startsWith(envConfig.settings.eventPrefix)
   );
@@ -70,7 +70,18 @@ const syncEvents = async () => {
   const processedEvents = new Set<string>();
   console.info(`Processing ${gCalEvents.length} Google Calendar Events`);
   //Loop through events where the gcal event hasn't been linked to discord
-  for (const gCalEvent of gCalEvents) {
+
+  const groupedEventsByNameAndStart = Object.groupBy(gCalEvents, ({summary, start}) => summary + start.dateTime);
+
+  for (const groupKey in groupedEventsByNameAndStart) {
+    let groupedEvents = groupedEventsByNameAndStart[groupKey]!;
+    let gCalEvent = groupedEvents[0];
+    if(groupedEvents.length > 1) {
+      let activeEvent = groupedEvents.find((item) => item.status != "cancelled");
+      if(activeEvent) {
+        gCalEvent = activeEvent;
+      }
+    }
     let updated = false;
     if (gCalEvent.extendedProperties?.private && DISCORD_LINK_PROPERTY in gCalEvent.extendedProperties.private) {
       console.info(
@@ -153,7 +164,7 @@ const syncEvents = async () => {
       );
       resync = true;
     } else {
-      console.info(`Creating ${event.title} as new event in google calendar for discord evet ${dEvent.id}`);
+      console.info(`Creating ${event.title} as new event in google calendar for discord event ${dEvent.id}`);
       await gCalClient.insertEvent(event.getGoogleInsertEvent(false), dEvent.id);
     }
   }
