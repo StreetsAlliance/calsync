@@ -30,6 +30,8 @@ const processedUnlinkedEvent = async (
   discordChannels: (StageChannel | VoiceChannel)[],
   processedEvents: Set<string>,
 ) => {
+  console.info(`Event ${gCalEvent.id} is not linked in discord, starting processedUnlinkedEvent`);
+
   const dEvents = discordEvents.filter((dEvent) =>
     dEvent.name.toLowerCase().trim() == gCalEvent.summary?.toLowerCase().trim() &&
     new Date(gCalEvent.start?.dateTime ?? 0).getTime() == dEvent.scheduledStartAt?.getTime() &&
@@ -37,18 +39,18 @@ const processedUnlinkedEvent = async (
   );
 
   if (dEvents.length == 1) {
-    console.info(`Linking ${gCalEvent.summary} to ${dEvents[0].id}.`);
+    console.info(`Event ${gCalEvent.id} Linking ${gCalEvent.summary} to ${dEvents[0].id}.`);
     processedEvents.add(dEvents[0].id);
     await gCalClient.addDiscordId(gCalEvent.id ?? "", dEvents[0].id);
   } else if (dEvents.length == 0) {
     //Event doesn't exist in discord, create.
-    console.info(`Creating ${gCalEvent.summary} in discord.`);
+    console.info(`Event ${gCalEvent.id} Creating ${gCalEvent.summary} in discord.`);
     const newDEvent = (new Event(gCalEvent)).getDiscordCreateOption(discordChannels, envConfig.settings.eventPrefix);
     const response = await discordClient.createScheduledEvent(
       newDEvent,
     );
     if (response) {
-      console.info(`Linking ${gCalEvent.summary} to ${response}.`);
+      console.info(`Event ${gCalEvent.id} Linking ${gCalEvent.summary} to ${response}.`);
       processedEvents.add(response);
       await gCalClient.addDiscordId(gCalEvent.id ?? "", response);
     }
@@ -71,25 +73,26 @@ const syncEvents = async () => {
   console.info(`Processing ${gCalEvents.length} Google Calendar Events`);
   //Loop through events where the gcal event hasn't been linked to discord
 
-  const groupedEventsByNameAndStart = Object.groupBy(gCalEvents, ({summary, start}) => summary + start.dateTime);
+  const groupedEventsByNameAndStart = Object.groupBy(gCalEvents, ({ summary, start }) => summary + start.dateTime);
 
   for (const groupKey in groupedEventsByNameAndStart) {
     let groupedEvents = groupedEventsByNameAndStart[groupKey]!;
     let gCalEvent = groupedEvents[0];
-    if(groupedEvents.length > 1) {
+    if (groupedEvents.length > 1) {
       let activeEvent = groupedEvents.find((item) => item.status != "cancelled");
-      if(activeEvent) {
+      if (activeEvent) {
         gCalEvent = activeEvent;
       }
     }
     let updated = false;
+    console.info(
+      `Starting match for ${gCalEvent.summary} with EventId ${gCalEvent.id}`,
+    );
     if (gCalEvent.extendedProperties?.private && DISCORD_LINK_PROPERTY in gCalEvent.extendedProperties.private) {
-      console.info(
-        `Starting match for ${gCalEvent.summary} with EventId ${gCalEvent.id} with discord link property ${
-          gCalEvent.extendedProperties!.private![DISCORD_LINK_PROPERTY]
-        }`,
-      );
       //Event is linked to discord
+      console.info(
+        `Event has discord link property ${gCalEvent.extendedProperties!.private![DISCORD_LINK_PROPERTY]}`,
+      );
       const dScheduledEvent = dScheduledEvents.find((dEvent) =>
         dEvent.id == gCalEvent.extendedProperties!.private![DISCORD_LINK_PROPERTY]
       );
@@ -141,6 +144,8 @@ const syncEvents = async () => {
       //Event isn't linked
       await processedUnlinkedEvent(gCalEvent, dScheduledEvents, discordChannels, processedEvents);
       updated = true;
+    } else {
+      console.info(`Event ${gCalEvent.id} was cancelled, no action`);
     }
 
     if (!updated && gCalEvent.status !== "cancelled") {
